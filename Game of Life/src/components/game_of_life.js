@@ -9,13 +9,13 @@ class GameOfLife extends Component {
     this.handleCellClicked = this.handleCellClicked.bind(this);
     this.handleButtonClicked = this.handleButtonClicked.bind(this);
     this.generateCoordinates = this.generateCoordinates.bind(this);
-    this.checkCellStatus = this.checkCellStatus.bind(this);
+    this.getCellNeighbors = this.getCellNeighbors.bind(this);
     this.advanceCycle = this.advanceCycle.bind(this);
     this.getCellIndex = this.getCellIndex.bind(this);
 
     this.state = {
-      width: 60,
-      height: 15,
+      width: 5,
+      height: 5,
       gridCoordinates: [],
       cycle: 0,
     }
@@ -42,25 +42,43 @@ class GameOfLife extends Component {
     this.generateCoordinates(this.state.width, this.state.height);
   }
 
-  advanceCycle() {
-    let existingGridCoords = this.state.gridCoordinates;
-    this.state.gridCoordinates.forEach((cell, cellIndex) => {
-      const neighboringCellStatus = this.checkCellStatus(cellIndex);
-      if (neighboringCellStatus.length !== 2 || neighboringCellStatus.length !== 3) {
-        existingGridCoords[cellIndex].age = 0;
+  advanceCycle(existingState) {
+    console.log("Existing state:", existingState);
+
+    const newState = existingState.map((cell) => {
+      const neighboringIndexes = this.getCellNeighbors(cell.coordinates);
+      const liveNeighbors = neighboringIndexes.filter(neighbor =>
+        existingState[neighbor].age > 0);
+
+      console.log("cell coords:", cell.coordinates, "live neighbors:", liveNeighbors.length);
+      //
+      if (cell.age > 0) {
+        console.log("cell observed as live:", cell.coordinates);
+        if (liveNeighbors.length === 2 || liveNeighbors.length === 3) {
+          console.log("cell survives:", cell.coordinates);
+          cell.age += 1;
+        } else {
+          console.log("cell dies:", cell.coordinates);
+          cell.age = 0;
+        }
+      } else {
+        console.log("cell observed as dead:", cell.coordinates);
+        if (liveNeighbors.length === 3) {
+          console.log("cell brought to life:", cell.coordinates);
+          cell.age += 1;
+        }
       }
+      return cell;
     });
-    this.setState({
-      gridCoordinates: existingGridCoords,
-    });
+
+    console.log("New state:", newState);
+
+    return newState;
   }
 
-  checkCellStatus(cellProps) {
-    console.log("Cell coordinates:", cellProps.coordinates)
-    const cellRow = cellProps.coordinates[0];
-    const cellColumn = cellProps.coordinates[1];
-    const cellIndex = this.getCellIndex(cellProps.coordinates);
-
+  getCellNeighbors(coordinates) {
+    const cellRow = coordinates[0];
+    const cellColumn = coordinates[1];
     let leftColumn, rightColumn, topRow, bottomRow;
 
 // Set left column value.
@@ -77,14 +95,14 @@ class GameOfLife extends Component {
       rightColumn = cellColumn + 1;
     }
 
-// Set top row.
+// Set top row value.
     if (cellRow === 0) {
       topRow = this.state.height - 1;
     } else {
       topRow = cellRow - 1;
     }
 
-// Set bottom row.
+// Set bottom row value.
     if (cellRow === this.state.height - 1) {
       bottomRow = 0;
     } else {
@@ -101,20 +119,24 @@ class GameOfLife extends Component {
     const bottomCenter = [bottomRow, cellColumn];
     const bottomRight = [bottomRow, rightColumn];
 
+// Build array of neighboring coordinates.
     const neighboringCells = [topLeft, topCenter, topRight, centerLeft, centerRight, bottomLeft, bottomCenter, bottomRight];
-    console.log(neighboringCells);
 
-    neighboringCells.forEach(neighbor => {
-      console.log(neighbor);
-      const neighborIndex = this.getCellIndex(neighbor);
-      console.log(this.getCellIndex([0, 0]))
+//Collect indexes
+    const neighboringIndexes = neighboringCells.map(neighbor => {
+      return this.getCellIndex(neighbor);
     });
+    return neighboringIndexes
+  }
+
+  getCellIndex(coordinates) {
+    const index = (coordinates[0] * this.state.width) + coordinates[1];
+    return index;
   }
 
   handleButtonClicked(value) {
     switch(value[0]) {
       case "size":
-      //Check if
         if (value[1][0] !== this.state.width && value[1][1] !== this.state.height) {
           this.setState({
             width: value[1][0],
@@ -126,14 +148,32 @@ class GameOfLife extends Component {
       case "control":
         switch(value[1]) {
           case "play":
-            console.log(this.state.gridCoordinates);
-
+            console.log("Grid status:", this.state.gridCoordinates);
             break;
           case "advance":
-            console.log("Control clicked: Advance");
+            const copyOfCurrentState = this.state.gridCoordinates;
+            console.log("Advance clicked. Current state:", copyOfCurrentState);
+
+            const newState = this.advanceCycle(copyOfCurrentState);
+
+            console.log("After function run. New state:", newState);
+            // const incrementCycle = this.state.cycle + 1;
+            //
+            // this.setState({
+            //   gridCoordinates: newState,
+            //   cycle: incrementCycle,
+            // });
             break;
           case "reset":
-            console.log("Control clicked: Reset");
+            const gridCopy = this.state.gridCoordinates;
+            gridCopy.map(cell => {
+              cell.age = 0;
+            });
+            this.setState({
+              gridCoordinates: gridCopy,
+              cycle: 0,
+            });
+            console.log("Grid reset. Grid:", this.state.gridCoordinates);
             break;
           default:
             break;
@@ -144,16 +184,18 @@ class GameOfLife extends Component {
     }
   }
 
-  getCellIndex(coordinates) {
-    console.log("Coordinates from method:", coordinates);
-    const index = this.state.gridCoordinates.findIndex(x =>{
-      console.log(`x: ${x.coordinates} , coords: ${coordinates}`)
-      x.coordinates === coordinates});
-      console.log(index);
-      return index;
-  }
-
   handleCellClicked(cellProps) {
+    const gridCopy = this.state.gridCoordinates;
+    const cellIndex = this.getCellIndex(cellProps.coordinates);
+    if (gridCopy[cellIndex].age !== 0) {
+      gridCopy[cellIndex].age = 0;
+    } else {
+      gridCopy[cellIndex].age = 1;
+    }
+
+    this.setState({
+      gridCoordinates: gridCopy,
+    });
   }
 
   render() {
@@ -165,7 +207,7 @@ class GameOfLife extends Component {
           rows={this.state.height}
           columns={this.state.width}
           coordinates={this.state.gridCoordinates}
-          onCellClicked={this.checkCellStatus}
+          onCellClicked={this.handleCellClicked}
         />
         <div className="row my-3">
           <div className="col-md-4">
